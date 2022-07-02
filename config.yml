@@ -1,0 +1,15 @@
+proxies:
+  'http': '127.0.0.1:30001'
+  'https': '127.0.0.1:30001'
+  'enable': 'on'
+
+folder_path:
+  'default_path': './imgs'
+
+file_path:
+  'empty_file_path': './empty_file.txt'
+
+headers:
+  'User-Agent': 'Mozilla/5.0 (X11; Linux x86_64; rv:101.0) Gecko/20100101 Firefox/101.0'
+
+
