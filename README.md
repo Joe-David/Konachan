@@ -11,4 +11,4 @@ This is a spider about konachan.com using python.You can download some anime pic
 
 
 
-Have a good time and enjoy your anime :>
+Have a good time and enjoy your anime :)
