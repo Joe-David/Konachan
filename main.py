@@ -1,30 +1,38 @@
-#import packages
+#inport async packages
+import aiohttp
+import asyncio
 
-import requests
-import os
+import numpy as np
 import sys
-import yaml
-from pathlib import Path
 from lxml import etree
+import time
+import os
+from pathlib import Path
+import yaml
+
 
 empty_img_list = []
+
 
 try:
     with open("config.yml","r") as f:
         #load config
-        print("\033[36m[INFO]\033[0m" + " load config")
         config = yaml.safe_load(f)
+
+        print("\033[36m[INFO]\033[0m" + " load config")
+
+
         folder_path = config['folder_path']['default_path']
         headers = config['headers']
-        proxies_enable = config['proxies']['enable']
+        proxy_enable = config['proxy']['enable']
         empty_file_path = config['file_path']['empty_file_path']
 
 
         print("\033[36m[INFO]\033[0m" + " load config[OK]\n")
 
 
-        if proxies_enable == "on":
-            proxies = config['proxies']
+        if proxy_enable == "on":
+            proxy = config['proxy']['http']
             print("\033[36m[INFO]\033[0m" + " proxy[on]\n")
 
         else:
@@ -38,8 +46,8 @@ except:
     exit()
 
 
-
-def init(folder_path,empty_file_path):
+async def init(folder_path,empty_file_path):
+    t1 = time.time()
     ##check the folder
 
     print("\033[36m[INFO]\033[0m" + " Checking folder\n")
@@ -51,7 +59,11 @@ def init(folder_path,empty_file_path):
         print("\033[36m[INFO]\033[0m" + " The folder has been created" + "[" + folder_path + "]")
         pass
 
-    print("\033[36m[INFO]\033[0m" + " init folder[OK]\n")
+    
+    t2 = time.time()
+    use_time = str(t2-t1) + "s"
+
+    print("\033[36m[INFO]\033[0m" + " init folder[OK]" + " use time:" + use_time + "\n")
 
     ##check the empty_file.txt
     print("\033[36m[INFO]\033[0m" + " Check the empty_file\n")
@@ -59,23 +71,30 @@ def init(folder_path,empty_file_path):
         print("\033[36m[INFO]\033[0m" " There wasn't the file" + "[" + empty_file_path + "]")
         print("\033[36m[INFO]\033[0m" + " Create the file" + "[" + empty_file_path + "]")
         Path(empty_file_path).touch()
-        
+
     else:
         print("\033[36m[INFO]\033[0m" + " The file has been created" + "[" + empty_file_path + "]")
         pass
-    
-    print("\033[36m[INFO]\033[0m" + " init file[OK]\n")
 
 
-def init_img_list():
+    t2 = time.time()
+    use_time = str(t2-t1) + "s"
+    print("\033[36m[INFO]\033[0m" + " init file[OK]" + " use time:" + use_time + "\n")
+
+
+async def init_img_list():
     print("\033[36m[INFO]\033[0m" + " init img list")
 
     web_url = "https://konachan.com/post"
-    html_response = request_html(web_url=web_url)
-    data = etree.HTML(html_response)
-    latest_img = str(data.xpath('//*[@id="post-list-posts"]/li/@id')[0]) ##get the latest img id
-    total_img = int(latest_img.split("p",1)[1])
 
+    async with aiohttp.ClientSession() as session:
+        async with session.get(url=web_url,headers=headers,proxy=proxy) as response:
+            html_response = await response.text()
+
+            data = etree.HTML(html_response)
+            latest_img = str(data.xpath('//*[@id="post-list-posts"]/li/@id')[0]) ##get the latest img id
+            total_img = int(latest_img.split("p",1)[1])
+            
 
     plan_img_list = []
     for i in range(total_img):
@@ -83,10 +102,12 @@ def init_img_list():
         plan_img_list.append(img_name)
 
     exists_img_list = os.listdir(folder_path) ##get exists_img_list of downloaded imgs
+
     with open("empty_file.txt","r") as f:
         empty_img_list = list(f.read())
-        f.close()
-    
+    f.close()
+
+
     img_list = list(set(plan_img_list) - set(exists_img_list) - set(empty_img_list))
 
     empty_img_list.clear()
@@ -95,29 +116,33 @@ def init_img_list():
     return img_list
 
 
-def request_html(web_url):
-    if proxies_enable == "on":
-        html_response = requests.get(url=web_url,headers=headers,proxies=proxies).text
+async def get_html(web_url):
+    async with aiohttp.ClientSession() as session:
+        if proxy_enable == 'on':
+            response = await session.get(url=web_url,headers=headers,proxy=proxy)
+        else:
+            response = await session.get(url=web_url,headers=headers)
+
+        html_response = await response.read()
+
         return html_response
-    else:
-        html_response = requests.get(url=web_url,headers=headers).text
-        return html_response
 
 
-def fetch_img(img_url):
-    if proxies_enable == "on":
-        img_content = requests.get(url=img_url,headers=headers,proxies=proxies).content
+async def fetch_img(img_url):
+    async with aiohttp.ClientSession() as session:
+        if proxy_enable == 'on':
+            response = await session.get(url=img_url,headers=headers,proxy=proxy)
+        else:
+            response = await session.get(url=img_url,headers=headers)
+
+        img_content = await response.read()
         return img_content
-    else:
-        img_content = requests.get(url=img_url,headers=headers).content
-        return img_content
 
+async def get_img_url(img_id):
 
+    web_url = "https://konachan.com/post/show/" + str(img_id)
 
-def get_img_url(img_id):
-    base_url = "https://konachan.com/post/show/" + str(img_id)
-
-    html_response = request_html(web_url=base_url)
+    html_response = await get_html(web_url=web_url)
     data = etree.HTML(html_response)
 
     #check if the img does not exist
@@ -134,20 +159,20 @@ def get_img_url(img_id):
         return img_status,img_url
 
 
-def save_img(folder_path,file_name,img_content):
 
-    img_size = str(sys.getsizeof(img_content) / 1024) + "Kb"
+async def save_img(folder_path,file_name,img_content):
+    
     try:
         with open(folder_path + "/" + file_name,"wb") as f:
-            print("\033[36m[INFO]\033[0m" + " Download the img" + "[" + file_name + "] " + img_size)
             f.write(img_content)
             f.close()
+    
     except IOError as e:
         print(e)
         pass
 
 
-def generate_empty_img_list(img_status,img_id):
+async def generate_empty_img_list(img_status,img_id):
     empty_file_name = img_id + ".jpg"
     if img_status == "empty":
         empty_img_list.append(empty_file_name)
@@ -156,35 +181,78 @@ def generate_empty_img_list(img_status,img_id):
         pass
 
 
-def download_img(img_name):
-    file_name = img_name
-    img_id = file_name.split(".",1)[0]
+async def download(img_id):
+    t1 = time.time()
 
-    img = get_img_url(img_id)
+    img = await get_img_url(img_id)
     img_status = img[0]
+    file_name = img_id + ".jpg"
+
 
     if img_status == "empty":
         print("\033[36m[INFO]\033[0m" + " img" + "[" + file_name + "]" + " does not exists")
-        empty_img_list = generate_empty_img_list(img_status,img_id)
+        empty_img_list = await generate_empty_img_list(img_status,img_id)
         if len(empty_img_list) >= 4:
             with open("empty_file.txt","a") as f:
                 for file_name in empty_img_list:
                     f.write(file_name + "\n")
                 empty_img_list.clear()
                 f.close()
-        pass
+                pass
 
     else:
         img_url = img[1]
-        img_content = fetch_img(img_url)
-        save_img(folder_path,file_name,img_content)
+        img_content = await fetch_img(img_url)
+        img_size = str(sys.getsizeof(img_content) / 1024) + "Kb"
+
+        await save_img(folder_path,file_name,img_content)
+        t2 = time.time()
+        use_time = str(t2-t1) + "s"
+        print("\033[36m[INFO]\033[0m" + " Download the img" + "[" + file_name + "] " + img_size + " " + use_time)
 
 
-def main():
-    init(folder_path,empty_file_path)
-    img_list = init_img_list()
-    for img_id in img_list:
-        download_img(img_id)
 
-if __name__ == "__main__":
-    main()
+async def downloader1():
+    img_list = await init_img_list()
+    img_list = np.array_split(np.array(img_list),4)
+
+    for img_name in img_list[0]:
+        img_id = img_name.split(".",2)[0]
+        await download(img_id)
+
+
+async def downloader2():
+    img_list = await init_img_list()
+    img_list = np.array_split(np.array(img_list),4)
+
+    for img_name in img_list[1]:
+        img_id = img_name.split(".",2)[0]
+        await download(img_id)
+
+async def downloader3():
+    img_list = await init_img_list()
+    img_list = np.array_split(np.array(img_list),4)
+
+    for img_name in img_list[2]:
+        img_id = img_name.split(".",2)[0]
+        await download(img_id)
+
+
+async def downloader4():
+    img_list = await init_img_list()
+    img_list = np.array_split(np.array(img_list),4)
+
+    for img_name in img_list[3]:
+        img_id = img_name.split(".",2)[0]
+        await download(img_id)
+
+
+task = [
+    init(folder_path,empty_file_path),
+    downloader1(),
+    downloader2(),
+    downloader3(),
+    downloader4(),
+]
+loop = asyncio.get_event_loop()
+loop.run_until_complete(asyncio.gather(*task))

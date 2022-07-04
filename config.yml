@@ -1,6 +1,5 @@
-proxies:
-  'http': '127.0.0.1:30001'
-  'https': '127.0.0.1:30001'
+proxy:
+  'http': 'http://127.0.0.1:30001'
   'enable': 'on'
 
 folder_path:
