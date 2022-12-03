@@ -87,14 +87,24 @@ async def init_img_list():
 
     web_url = "https://konachan.com/post"
 
-    async with aiohttp.ClientSession() as session:
-        async with session.get(url=web_url,headers=headers,proxy=proxy) as response:
-            html_response = await response.text()
 
-            data = etree.HTML(html_response)
-            latest_img = str(data.xpath('//*[@id="post-list-posts"]/li/@id')[0]) ##get the latest img id
-            total_img = int(latest_img.split("p",1)[1])
-            
+    async with aiohttp.ClientSession() as session:
+        if proxy_enable == "on":
+            async with session.get(url=web_url,headers=headers,proxy=proxy) as response:
+
+                html_response = await response.text()
+                data = etree.HTML(html_response)
+                latest_img = str(data.xpath('//*[@id="post-list-posts"]/li/@id')[0]) ##get the latest img id
+                total_img = int(latest_img.split("p",1)[1])
+        else:
+            async with session.get(url=web_url,headers=headers) as response:
+
+                html_response = await response.text()
+                data = etree.HTML(html_response)
+                latest_img = str(data.xpath('//*[@id="post-list-posts"]/li/@id')[0]) ##get the latest img id
+                total_img = int(latest_img.split("p",1)[1])
+
+          
 
     plan_img_list = []
     for i in range(total_img):
