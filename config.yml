@@ -1,6 +1,6 @@
 proxy:
   'http': 'http://127.0.0.1:30001'
-  'enable': 'on'
+  'enable': 'off'
 
 folder_path:
   'default_path': './imgs'
